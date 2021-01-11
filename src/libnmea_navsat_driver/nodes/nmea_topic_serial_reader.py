@@ -56,6 +56,9 @@ def main(args=None):
         try:
             while rclpy.ok():
                 data = GPS.readline().strip()
+                if isinstance(data, bytes):
+                    data = data.decode("ascii")
+                driver.add_sentence(data, frame_id)
 
                 sentence = Sentence()
                 sentence.header.stamp = driver.get_clock().now().to_msg()
