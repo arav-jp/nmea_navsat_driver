@@ -125,16 +125,16 @@ def convert_time(nmea_utc):
 
     # Get current time in UTC for date information
     utc_time = datetime.datetime.utcnow()
-    hours = int(nmea_utc[0:2])
-    minutes = int(nmea_utc[2:4])
-    seconds = int(nmea_utc[4:6])
+    hours = safe_int(nmea_utc[0:2])
+    minutes = safe_int(nmea_utc[2:4])
+    seconds = safe_int(nmea_utc[4:6])
     nanosecs = 0
     # If the seconds includes a decimal portion, convert it to nanoseconds
     if len(nmea_utc) > 7:
-        nanosecs = int(nmea_utc[7:]) * pow(10, 9 - len(nmea_utc[7:]))
+        nanosecs = safe_int(nmea_utc[7:]) * pow(10, 9 - len(nmea_utc[7:]))
 
     # Resolve the ambiguity of day
-    day_offset = int((utc_time.hour - hours)/12.0)
+    day_offset = safe_int((utc_time.hour - hours)/12.0)
     utc_time += datetime.timedelta(day_offset)
     utc_time.replace(hour=hours, minute=minutes, second=seconds)
 
@@ -168,18 +168,21 @@ def convert_time_rmc(date_str, time_str):
     example 2: utc_year = 00, pc_year = 2099
     years = 2099 + int((2099 % 100 - 00) / 50.0) = 2100
     """
-    utc_year = int(date_str[4:6])
-    years = pc_year + int((pc_year % 100 - utc_year) / 50.0)
+    utc_year = safe_int(date_str[4:6])
+    years = pc_year + safe_int((pc_year % 100 - utc_year) / 50.0)
 
-    months = int(date_str[2:4])
-    days = int(date_str[0:2])
+    months = safe_int(date_str[2:4])
+    days = safe_int(date_str[0:2])
 
-    hours = int(time_str[0:2])
-    minutes = int(time_str[2:4])
-    seconds = int(time_str[4:6])
-    nanosecs = int(time_str[7:]) * pow(10, 9 - len(time_str[7:]))
+    hours = safe_int(time_str[0:2])
+    minutes = safe_int(time_str[2:4])
+    seconds = safe_int(time_str[4:6])
+    nanosecs = safe_int(time_str[7:]) * pow(10, 9 - len(time_str[7:]))
 
-    unix_secs = calendar.timegm((years, months, days, hours, minutes, seconds))
+    try:
+        unix_secs = calendar.timegm((years, months, days, hours, minutes, seconds))
+    except ValueError:
+        return (float('NaN'), float('NaN'))
     return (unix_secs, nanosecs)
 
 
