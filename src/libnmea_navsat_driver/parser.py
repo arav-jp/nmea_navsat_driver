@@ -179,7 +179,10 @@ def convert_time_rmc(date_str, time_str):
     seconds = int(time_str[4:6])
     nanosecs = int(time_str[7:]) * pow(10, 9 - len(time_str[7:]))
 
-    unix_secs = calendar.timegm((years, months, days, hours, minutes, seconds))
+    try:
+        unix_secs = calendar.timegm((years, months, days, hours, minutes, seconds))
+    except ValueError:
+        return (float('NaN'), float('NaN'))
     return (unix_secs, nanosecs)
 
 
