@@ -37,6 +37,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix, NavSatStatus, TimeReference
 from geometry_msgs.msg import TwistStamped, QuaternionStamped
+from diagnostic_msgs.msg import KeyValue
 from tf_transformations import quaternion_from_euler
 from libnmea_navsat_driver.checksum_utils import check_nmea_checksum
 from libnmea_navsat_driver import parser
@@ -71,6 +72,13 @@ class Ros2NMEADriver(Node):
         self.lon_std_dev = float("nan")
         self.lat_std_dev = float("nan")
         self.alt_std_dev = float("nan")
+
+        # Diagnostic state tracking
+        self.diag_checksum_error = False
+        self.diag_parse_error = False
+        self.diag_fix_type = -1
+        self.diag_num_satellites = 0
+        self.diag_hdop = float("nan")
 
         """Format for this dictionary is the fix type from a GGA message as the key, with
         each entry containing a tuple consisting of a default estimated
@@ -126,11 +134,13 @@ class Ros2NMEADriver(Node):
         if not check_nmea_checksum(nmea_string):
             self.get_logger().warn("Received a sentence with an invalid checksum. " +
                                    "Sentence was: %s" % nmea_string)
+            self.diag_checksum_error = True
             return False
 
         parsed_sentence = parser.parse_nmea_sentence(nmea_string)
         if not parsed_sentence:
             self.get_logger().debug("Failed to parse NMEA sentence. Sentence was: %s" % nmea_string)
+            self.diag_parse_error = True
             return False
 
         if timestamp:
@@ -168,6 +178,11 @@ class Ros2NMEADriver(Node):
                 self.valid_fix = True
             else:
                 self.valid_fix = False
+
+            # Update diagnostic state
+            self.diag_fix_type = fix_type
+            self.diag_num_satellites = data['num_satellites']
+            self.diag_hdop = data['hdop']
 
             current_fix.status.service = NavSatStatus.SERVICE_GPS
             latitude = data['latitude']
@@ -287,3 +302,42 @@ class Ros2NMEADriver(Node):
         if len(prefix):
             return '%s/%s' % (prefix, frame_id)
         return frame_id
+
+    def get_diagnostic_values(self):
+        """Return list of KeyValue pairs representing current diagnostic state."""
+        values = []
+
+        # RS232通信データ: checksum or parse error
+        kv = KeyValue()
+        kv.key = 'rs232_data_error'
+        kv.value = '1' if (self.diag_checksum_error or self.diag_parse_error) else '0'
+        values.append(kv)
+
+        # センサエラー独自コード: no fix
+        kv = KeyValue()
+        kv.key = 'custom_error_code'
+        kv.value = '1' if (self.diag_fix_type <= 0) else '0'
+        values.append(kv)
+
+        # Informational values
+        kv = KeyValue()
+        kv.key = 'fix_type'
+        kv.value = str(self.diag_fix_type)
+        values.append(kv)
+
+        kv = KeyValue()
+        kv.key = 'num_satellites'
+        kv.value = str(self.diag_num_satellites)
+        values.append(kv)
+
+        kv = KeyValue()
+        kv.key = 'hdop'
+        kv.value = str(self.diag_hdop)
+        values.append(kv)
+
+        return values
+
+    def reset_diagnostic_flags(self):
+        """Reset per-period diagnostic flags."""
+        self.diag_checksum_error = False
+        self.diag_parse_error = False

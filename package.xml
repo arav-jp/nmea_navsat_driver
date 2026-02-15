@@ -17,6 +17,7 @@
     <author email="eric@ericperko.com">Eric Perko</author>
     <author>Steven Martin</author>
 
+    <exec_depend>diagnostic_msgs</exec_depend>
     <exec_depend>geometry_msgs</exec_depend>
     <exec_depend>nmea_msgs</exec_depend>
     <exec_depend>rclpy</exec_depend>
